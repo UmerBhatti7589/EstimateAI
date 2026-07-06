@@ -25,9 +25,33 @@ def analyze_requirement(description: str):
     if "report" in text:
         detected_features.append("Reports")
 
+    tech_stack = {
+        "Backend": "FastAPI",
+        "Frontend": "React",
+        "Database": "PostgreSQL",
+        "Authentication": "JWT",
+        "Deployment": "Docker"
+    }
+
+    feature_count = len(detected_features)
+
+    if feature_count <= 2:
+        timeline = "1 Week"
+
+    elif feature_count <= 5:
+        timeline = "2 Weeks"
+
+    elif feature_count <= 8:
+        timeline = "1 Month"
+
+    else:
+        timeline = "2 Months"
+
     return {
         "original_requirement": description,
         "detected_features": detected_features,
-        "total_features": len(detected_features),
+        "total_features": feature_count,
+        "recommended_tech_stack": tech_stack,
+        "estimated_timeline": timeline,
         "status": "Analysis Completed"
     }
