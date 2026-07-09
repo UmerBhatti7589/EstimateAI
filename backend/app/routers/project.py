@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -38,8 +38,21 @@ def create_project(project: ProjectRequest, db: Session = Depends(get_db)):
 # Get All Projects
 @router.get("/projects")
 def get_projects(db: Session = Depends(get_db)):
+    return db.query(Project).all()
 
-    projects = db.query(Project).all()
+
+# Search Projects
+@router.get("/projects/search")
+def search_projects(
+    keyword: str = Query(...),
+    db: Session = Depends(get_db)
+):
+
+    projects = db.query(Project).filter(
+        (Project.project_name.ilike(f"%{keyword}%")) |
+        (Project.client_name.ilike(f"%{keyword}%")) |
+        (Project.description.ilike(f"%{keyword}%"))
+    ).all()
 
     return projects
 
