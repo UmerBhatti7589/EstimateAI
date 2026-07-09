@@ -5,3 +5,9 @@ class ProjectRequest(BaseModel):
     project_name: str
     client_name: str
     description: str
+
+
+class ProjectUpdate(BaseModel):
+    project_name: str
+    client_name: str
+    description: str
