@@ -91,3 +91,23 @@ def update_project(
         "message": "Project updated successfully",
         "project": project
     }
+
+
+# Delete Project
+@router.delete("/project/{project_id}")
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if project is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found"
+        )
+
+    db.delete(project)
+    db.commit()
+
+    return {
+        "message": "Project deleted successfully"
+    }
