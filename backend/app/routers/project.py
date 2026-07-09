@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import asc, desc
 
 from app.database.database import get_db
 from app.models.project import Project
@@ -35,10 +36,34 @@ def create_project(project: ProjectRequest, db: Session = Depends(get_db)):
     }
 
 
-# Get All Projects
+# Get All Projects (Pagination + Sorting)
 @router.get("/projects")
-def get_projects(db: Session = Depends(get_db)):
-    return db.query(Project).all()
+def get_projects(
+    page: int = Query(1, ge=1),
+    limit: int = Query(5, ge=1),
+    sort: str = Query("id"),
+    order: str = Query("asc"),
+    db: Session = Depends(get_db)
+):
+
+    query = db.query(Project)
+
+    if hasattr(Project, sort):
+        column = getattr(Project, sort)
+
+        if order.lower() == "desc":
+            query = query.order_by(desc(column))
+        else:
+            query = query.order_by(asc(column))
+
+    projects = query.offset((page - 1) * limit).limit(limit).all()
+
+    return {
+        "page": page,
+        "limit": limit,
+        "total_projects": db.query(Project).count(),
+        "projects": projects
+    }
 
 
 # Search Projects
