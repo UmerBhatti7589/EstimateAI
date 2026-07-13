@@ -1,18 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import asc, desc
 
 from app.database.database import get_db
 from app.models.project import Project
 from app.schemas.project import ProjectRequest, ProjectUpdate
 from app.services.analyzer import analyze_requirement
+from app.services.security import get_current_user
 
 router = APIRouter()
 
 
 # Create Project
 @router.post("/project")
-def create_project(project: ProjectRequest, db: Session = Depends(get_db)):
+def create_project(
+    project: ProjectRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
 
     analysis = analyze_requirement(project.description)
 
@@ -36,55 +40,29 @@ def create_project(project: ProjectRequest, db: Session = Depends(get_db)):
     }
 
 
-# Get All Projects (Pagination + Sorting)
+# Get All Projects
 @router.get("/projects")
 def get_projects(
-    page: int = Query(1, ge=1),
-    limit: int = Query(5, ge=1),
-    sort: str = Query("id"),
-    order: str = Query("asc"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
 ):
 
-    query = db.query(Project)
-
-    if hasattr(Project, sort):
-        column = getattr(Project, sort)
-
-        if order.lower() == "desc":
-            query = query.order_by(desc(column))
-        else:
-            query = query.order_by(asc(column))
-
-    projects = query.offset((page - 1) * limit).limit(limit).all()
+    projects = db.query(Project).all()
 
     return {
-        "page": page,
-        "limit": limit,
-        "total_projects": db.query(Project).count(),
+        "page": 1,
+        "total_projects": len(projects),
         "projects": projects
     }
 
 
-# Search Projects
-@router.get("/projects/search")
-def search_projects(
-    keyword: str = Query(...),
-    db: Session = Depends(get_db)
-):
-
-    projects = db.query(Project).filter(
-        (Project.project_name.ilike(f"%{keyword}%")) |
-        (Project.client_name.ilike(f"%{keyword}%")) |
-        (Project.description.ilike(f"%{keyword}%"))
-    ).all()
-
-    return projects
-
-
 # Get Single Project
 @router.get("/project/{project_id}")
-def get_project(project_id: int, db: Session = Depends(get_db)):
+def get_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
 
     project = db.query(Project).filter(Project.id == project_id).first()
 
@@ -102,7 +80,8 @@ def get_project(project_id: int, db: Session = Depends(get_db)):
 def update_project(
     project_id: int,
     updated_project: ProjectUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
 ):
 
     project = db.query(Project).filter(Project.id == project_id).first()
@@ -133,7 +112,11 @@ def update_project(
 
 # Delete Project
 @router.delete("/project/{project_id}")
-def delete_project(project_id: int, db: Session = Depends(get_db)):
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
 
     project = db.query(Project).filter(Project.id == project_id).first()
 

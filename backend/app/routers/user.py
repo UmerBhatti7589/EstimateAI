@@ -1,16 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin
+from app.schemas.user import UserCreate
 from app.services.security import (
     hash_password,
     verify_password,
-    create_access_token
+    create_access_token,
+    verify_access_token
 )
 
 router = APIRouter()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
 # Register User
@@ -47,31 +51,51 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 # Login User
 @router.post("/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
 
     db_user = db.query(User).filter(
-        User.email == user.email
+        User.email == form_data.username
     ).first()
 
-    if not db_user:
+    if db_user is None:
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
 
-    if not verify_password(user.password, db_user.password):
+    if not verify_password(form_data.password, db_user.password):
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
 
-    token = create_access_token(
+    access_token = create_access_token(
         {
             "sub": db_user.email
         }
     )
 
     return {
-        "access_token": token,
+        "access_token": access_token,
         "token_type": "bearer"
+    }
+
+
+# Current Logged In User
+@router.get("/me")
+def get_current_user(token: str = Depends(oauth2_scheme)):
+
+    payload = verify_access_token(token)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token"
+        )
+
+    return {
+        "logged_in_user": payload["sub"]
     }
