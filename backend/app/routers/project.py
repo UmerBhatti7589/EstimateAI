@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import asc, desc
 
 from app.database.database import get_db
 from app.models.project import Project
@@ -40,17 +41,36 @@ def create_project(
     }
 
 
-# Get All Projects
+# Get All Projects with Search, Filter & Sort
 @router.get("/projects")
 def get_projects(
+    search: str = Query(None),
+    client: str = Query(None),
+    sort: str = Query("latest"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
 
-    projects = db.query(Project).all()
+    query = db.query(Project)
+
+    if search:
+        query = query.filter(
+            Project.project_name.contains(search)
+        )
+
+    if client:
+        query = query.filter(
+            Project.client_name.contains(client)
+        )
+
+    if sort == "oldest":
+        query = query.order_by(asc(Project.id))
+    else:
+        query = query.order_by(desc(Project.id))
+
+    projects = query.all()
 
     return {
-        "page": 1,
         "total_projects": len(projects),
         "projects": projects
     }
