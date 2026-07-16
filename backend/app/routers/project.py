@@ -16,7 +16,7 @@ router = APIRouter()
 def create_project(
     project: ProjectRequest,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
 
     analysis = analyze_requirement(project.description)
@@ -27,7 +27,8 @@ def create_project(
         description=project.description,
         detected_features=", ".join(analysis["detected_features"]),
         estimated_timeline=analysis["estimated_timeline"],
-        estimated_cost=analysis["estimated_cost"]
+        estimated_cost=analysis["estimated_cost"],
+        user_id=current_user.id
     )
 
     db.add(db_project)
@@ -41,27 +42,25 @@ def create_project(
     }
 
 
-# Get All Projects with Search, Filter & Sort
+# Get All Projects (Only Current User)
 @router.get("/projects")
 def get_projects(
     search: str = Query(None),
     client: str = Query(None),
     sort: str = Query("latest"),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
 
-    query = db.query(Project)
+    query = db.query(Project).filter(
+        Project.user_id == current_user.id
+    )
 
     if search:
-        query = query.filter(
-            Project.project_name.contains(search)
-        )
+        query = query.filter(Project.project_name.contains(search))
 
     if client:
-        query = query.filter(
-            Project.client_name.contains(client)
-        )
+        query = query.filter(Project.client_name.contains(client))
 
     if sort == "oldest":
         query = query.order_by(asc(Project.id))
@@ -81,10 +80,13 @@ def get_projects(
 def get_project(
     project_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
 
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
 
     if project is None:
         raise HTTPException(
@@ -101,10 +103,13 @@ def update_project(
     project_id: int,
     updated_project: ProjectUpdate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
 
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
 
     if project is None:
         raise HTTPException(
@@ -135,10 +140,13 @@ def update_project(
 def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
 
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
 
     if project is None:
         raise HTTPException(
@@ -151,4 +159,38 @@ def delete_project(
 
     return {
         "message": "Project deleted successfully"
+    }
+    # Dashboard Statistics
+@router.get("/dashboard")
+def dashboard(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+
+    projects = db.query(Project).filter(
+        Project.user_id == current_user.id
+    ).all()
+
+    total = len(projects)
+
+    simple = len([
+        project for project in projects
+        if project.estimated_timeline == "1 Week"
+    ])
+
+    medium = len([
+        project for project in projects
+        if project.estimated_timeline == "2 Weeks"
+    ])
+
+    complex_projects = len([
+        project for project in projects
+        if project.estimated_timeline == "1 Month"
+    ])
+
+    return {
+        "total_projects": total,
+        "simple_projects": simple,
+        "medium_projects": medium,
+        "complex_projects": complex_projects
     }

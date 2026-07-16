@@ -4,6 +4,10 @@ from jose import JWTError, jwt
 from passlib.hash import bcrypt
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
+
+from app.database.database import get_db
+from app.models.user import User
 
 SECRET_KEY = "estimateai_secret_key"
 ALGORITHM = "HS256"
@@ -51,7 +55,11 @@ def verify_access_token(token: str):
         return None
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+# Returns User object instead of only JWT payload
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
 
     payload = verify_access_token(token)
 
@@ -61,4 +69,16 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             detail="Invalid or expired token"
         )
 
-    return payload
+    email = payload.get("sub")
+
+    user = db.query(User).filter(
+        User.email == email
+    ).first()
+
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found"
+        )
+
+    return user

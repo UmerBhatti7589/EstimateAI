@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, ForeignKey
 
 from app.database.database import Base
 
@@ -20,3 +20,6 @@ class Project(Base):
     estimated_timeline = Column(String)
 
     estimated_cost = Column(String)
+
+    # Owner of Project
+    user_id = Column(Integer, ForeignKey("users.id"))
